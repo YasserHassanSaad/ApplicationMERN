@@ -6,6 +6,7 @@ import dotenv from 'dotenv'
 
 // Importing all the needed modules. 
 import postRoutes from './routes/posts.js'
+import userRoutes from './routes/users.js'
 
 
 // Intialize our app with express and do some general setup. 
@@ -17,8 +18,9 @@ app.use(cors())
 
 // Use middleware to connect routes to our application, by giving a starting url and routing functions. 
 app.use("/posts", postRoutes)
+app.use("/users", userRoutes)
 
-// Make a greating text when access the API. 
+// Make a greeting text when access the API. 
 app.get("/", (req, res) => {
     res.send("Hello to memories API")
 })

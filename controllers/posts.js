@@ -7,19 +7,54 @@ import PostMessage from '../models/postMessage.js'
 
 // the '/' get request route handler. 
 export const getPosts = async (req, res) => {
+    const { page } = req.query
+
     try {
-        const postMessages = await PostMessage.find()
-        //console.log(postMessages)
-        res.status(200).json(postMessages)
+        const LIMIT = 8
+        const startIndex = (Number(page) - 1) * LIMIT
+        const total = await PostMessage.countDocuments({})
+        const posts = await PostMessage.find().sort({ _id: -1 }).limit(LIMIT).skip(startIndex)
+        res.status(200).json({ data: posts, currentPage: Number(page), numberOfPages: Math.ceil(total / LIMIT) })
     } catch (error) {
         res.status(404).json({message: error.message})
+    }
+}
+
+// the '/:id' get request route handler. 
+export const getPost = async (req, res) => {
+    const { id } = req.params
+
+    try {
+        const post = await PostMessage.findById(id)
+        res.status(200).json(post)
+    } catch (error) {
+        res.status(404).json({message: error.message})
+    }
+}
+
+// the '/search' get request route handler. 
+export const getPostsBySearch = async (req, res) => {
+    console.log("Controller 1")
+    const { searchQuery, tags } = req.query
+    console.log("Controller 2")
+
+    try {
+        console.log("Controller 3")
+        const title = new RegExp(searchQuery, "i")
+        console.log("Controller 4")
+        const posts = await PostMessage.find({ $or: [ { title }, { tags: { $in: tags.split(',') } } ]})
+        console.log("Controller 5")
+        res.json({ data: posts })
+    } catch (error) {   
+        console.log("Controller Error")
+        res.status(404).json({ message: error.message });
     }
 }
 
 // the '/' post request route handler. 
 export const createPost = async (req, res) => {
     const post = req.body
-    const newPost = PostMessage(post)
+    const newPost = PostMessage({ ...post, creator: req.userId, createdAt: new Date().toISOString() })
     try {
         await newPost.save()
         res.status(201).json(newPost)
@@ -56,10 +91,20 @@ export const deletePost = async (req, res) => {
 export const likePost = async (req, res) => {
     const { id } = req.params
 
-    if(!mongoose.Types.ObjectId.isValid(id)) return res.status(404).send("No post with that id")
+    if(!req.userId) { return res.json({ message: "Unauthenticated" }) }
+
+    if(!mongoose.Types.ObjectId.isValid(id)) { return res.status(404).send("No post with that id") }
 
     const post = await PostMessage.findById(id)
-    const updatedPost = await PostMessage.findByIdAndUpdate(id, { likeCount: post.likeCount + 1 }, { new: true })
+    const index = post.likes.findIndex((id) => id === String(req.userId))
+
+    if(index === -1) {
+        post.likes.push(req.userId)
+    } else {
+        post.likes = post.likes.filter((id) => id !== String(req.userId))
+    }
+
+    const updatedPost = await PostMessage.findByIdAndUpdate(id, post, { new: true })
 
     res.json(updatedPost)
 }
